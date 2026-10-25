@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -29,6 +30,7 @@ FILES = {
     "/flywire_brain.json": (DATA / "flywire_brain.json", "application/json; charset=utf-8"),
 }
 LIVE_LOCK = threading.Lock()
+READY = threading.Event()
 CSV_COLUMNS = [
     "severity",
     "disease_score",
@@ -48,18 +50,43 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self._cors()
         self.end_headers()
         self.wfile.write(body)
+
+    def _cors(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def _ready(self) -> bool:
+        if READY.is_set():
+            return True
+        self._json({"error": "계산을 준비하고 있습니다."}, 503)
+        return False
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self._cors()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _json(self, payload: object, code: int = 200) -> None:
         self._send(code, json.dumps(payload, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/health":
+            self._json({"ok": True, "ready": READY.is_set()})
+            return
         if parsed.path == "/api/meta":
+            if not self._ready():
+                return
             self._json(meta())
             return
         if parsed.path in {"/api/dose", "/api/dose.csv"}:
+            if not self._ready():
+                return
             disease = parse_qs(parsed.query).get("disease", ["parkinson"])[0]
             if disease not in DISEASES:
                 self._json({"error": "알 수 없는 질병입니다."}, 400)
@@ -73,6 +100,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "text/csv; charset=utf-8")
                 self.send_header("Content-Disposition", f'attachment; filename="{disease}.csv"')
                 self.send_header("Content-Length", str(len(body)))
+                self._cors()
                 self.end_headers()
                 self.wfile.write(body)
                 return
@@ -110,6 +138,8 @@ class Handler(BaseHTTPRequestHandler):
         if disease not in DISEASES:
             self._json({"error": "알 수 없는 질병입니다."}, 400)
             return
+        if not self._ready():
+            return
         with LIVE_LOCK:
             if path == "/api/reset":
                 payload = live_reset(disease, severity)
@@ -124,13 +154,24 @@ def main() -> None:
 
         run_checks()
         return
-    port = 8765
+    port = int(os.environ["PORT"]) if "PORT" in os.environ else 8765
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
-    print("건강한 파리의 기준을 준비합니다...")
-    warmup()
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"시뮬레이션 화면: http://127.0.0.1:{port}")
+    host = "0.0.0.0" if "PORT" in os.environ else "127.0.0.1"
+
+    def boot() -> None:
+        print("건강한 파리의 기준을 준비합니다...")
+        try:
+            warmup()
+        except Exception as error:
+            print(f"기준 준비 실패: {error}", file=sys.stderr)
+            return
+        READY.set()
+        print("계산 준비 완료")
+
+    threading.Thread(target=boot, daemon=True).start()
+    server = ThreadingHTTPServer((host, port), Handler)
+    print(f"시뮬레이션 화면: http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

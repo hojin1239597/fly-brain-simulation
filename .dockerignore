@@ -1,0 +1,7 @@
+.git
+data/raw
+dist
+MUJOCO_LOG.TXT
+__pycache__
+*.pyc
+.DS_Store

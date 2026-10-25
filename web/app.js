@@ -37,7 +37,14 @@ const SIZES = {
 };
 
 const ARENA = 3.05;
+const API_BASE = ["localhost", "127.0.0.1"].includes(location.hostname)
+  ? ""
+  : "https://fly-brain-simulation.onrender.com";
 const $ = (id) => document.getElementById(id);
+
+function api(path) {
+  return `${API_BASE}${path}`;
+}
 
 let meta = null;
 let result = null;
@@ -458,14 +465,27 @@ function showFrame(payload) {
   remember(payload.frame.fly);
 }
 
+async function fetchApi(path, options) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const response = await fetch(api(path), options);
+    if (response.status === 502 || response.status === 503) {
+      showError(new Error("서버를 준비하고 있습니다. 잠시만 기다려 주세요."));
+      await new Promise((resolve) => window.setTimeout(resolve, 5000));
+      continue;
+    }
+    if (!response.ok) throw new Error("시뮬레이션을 받지 못했습니다.");
+    $("banner").hidden = true;
+    return response.json();
+  }
+  throw new Error("서버 준비가 끝나지 않았습니다.");
+}
+
 async function postLive(path, body) {
-  const response = await fetch(path, {
+  return fetchApi(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("시뮬레이션을 받지 못했습니다.");
-  return response.json();
 }
 
 let ticking = false;
@@ -488,8 +508,7 @@ async function pull() {
 
 function loadDose() {
   const asked = disease;
-  fetch(`/api/dose?disease=${asked}`)
-    .then((response) => response.json())
+  fetchApi(`/api/dose?disease=${asked}`)
     .then((payload) => {
       if (asked !== disease || !payload.points) return;
       dose = payload.points;
@@ -553,7 +572,7 @@ function bind() {
 async function main() {
   bind();
   try {
-    meta = await fetch("/api/meta").then((res) => res.json());
+    meta = await fetchApi("/api/meta");
     $("legend").innerHTML = meta.groups.map((group) => (
       `<span class="chip" data-id="${group.id}"><i style="background:${COLORS[group.id]}"></i>${group.name} ${group.count.toLocaleString("ko-KR")}<b>100%</b></span>`
     )).join("");

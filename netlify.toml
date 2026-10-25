@@ -1,0 +1,3 @@
+[build]
+command = "mkdir -p dist && cp -R web/. dist/ && cp data/flywire_brain.json data/flywire_points.bin dist/"
+publish = "dist"

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: fly-brain-simulation
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: MUJOCO_GL
+        value: osmesa
+
