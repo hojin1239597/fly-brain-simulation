@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>초파리 뇌 질병 시뮬레이션</title>
+        <link rel="stylesheet" href="/style.css" />
+        <script type="importmap">
+            { "imports": { "three": "/vendor/three.module.js" } }
+        </script>
+    </head>
+    <body>
+        <header>
+            <p class="eyebrow">FlyWire FAFB v783</p>
+            <h1>초파리의 뇌와 몸</h1>
+        </header>
+        <p id="banner" class="banner" hidden></p>
+
+        <div class="layout">
+            <aside class="panel controls">
+                <h2>질병</h2>
+                <div class="cards" id="cards">
+                    <button
+                        type="button"
+                        class="card active"
+                        data-disease="parkinson"
+                        aria-pressed="true"
+                    >
+                        <strong>파킨슨</strong>
+                        <span
+                            >도파민 신경이 보내는 연결을 줄여 파킨슨 병을
+                            유도.</span
+                        >
+                    </button>
+                </div>
+
+                <label class="slider">
+                    <span>뇌 손상 <output id="severity-out">60%</output></span>
+                    <input
+                        id="severity"
+                        type="range"
+                        min="0"
+                        max="100"
+                        value="60"
+                        step="1"
+                    />
+                </label>
+
+                <ol class="chain" id="chain"></ol>
+                <dl class="metrics" id="metrics"></dl>
+                <p class="story" id="story"></p>
+
+                <div class="transport">
+                    <button type="button" id="play">일시정지</button>
+                    <button type="button" id="restart">처음부터</button>
+                    <button type="button" id="speed">1×</button>
+                </div>
+            </aside>
+
+            <div class="stage">
+                <section class="panel viewport-wrap">
+                    <div class="panel-head">
+                        <h2>몸</h2>
+                        <p>그냥 걸어 다니는 파리 및 관 오르는 파리</p>
+                    </div>
+                    <div class="viewport" id="body-view">
+                        <canvas id="body-canvas"></canvas>
+                        <div class="hud">
+                            <strong id="phase">지내는 중</strong>
+                            <span id="body-live"></span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel viewport-wrap">
+                    <div class="panel-head">
+                        <h2>뇌</h2>
+                        <p id="brain-note">
+                            139,248개 신경의 실제 좌표. 옅고 붉은 점이 잃은
+                            부분.
+                        </p>
+                    </div>
+                    <div class="viewport" id="brain-view">
+                        <canvas id="brain-canvas"></canvas>
+                        <div class="hud">
+                            <strong id="loss-live">뇌 지도를 읽는 중</strong>
+                            <span>등쪽이 위 · 양옆이 시각엽</span>
+                        </div>
+                    </div>
+                    <div class="legend" id="legend"></div>
+                </section>
+
+                <section class="panel chart-panel">
+                    <div class="panel-head">
+                        <h2>원인 강도에 따른 변화</h2>
+                    </div>
+                    <div class="charts">
+                        <figure>
+                            <figcaption>
+                                <h3>도파민 신경 생존</h3>
+                                <p>
+                                    원인입니다. PAM 307개와 PPL·PPM 40개 가운데
+                                    신호를 아직 보내는 비율. 위쪽이 많이 남은
+                                    상태.
+                                </p>
+                            </figcaption>
+                            <canvas
+                                data-key="change_value"
+                                data-color="#ffc857"
+                            ></canvas>
+                            <p class="chart-now" data-now="change_value"></p>
+                        </figure>
+                        <figure>
+                            <figcaption>
+                                <h3>버섯체 활동 감소</h3>
+                                <p>
+                                    연결을 계산한 결과. 케니언 세포와 버섯체
+                                    출력의 활동이 건강한 파리보다 평균적으로
+                                    얼마나 줄었는지 보여줌. 위쪽이 더 많이
+                                    줄어든 상태.
+                                </p>
+                            </figcaption>
+                            <canvas
+                                data-key="disease_score"
+                                data-color="#ff5d36"
+                            ></canvas>
+                            <p class="chart-now" data-now="disease_score"></p>
+                        </figure>
+                        <figure>
+                            <figcaption>
+                                <h3>걸음</h3>
+                                <p>
+                                    식도하와 하행신경 활동으로 정한 미는
+                                    힘입니다. 건강한 파리와 같으면 위쪽
+                                    100%입니다.
+                                </p>
+                            </figcaption>
+                            <canvas
+                                data-key="locomotion"
+                                data-color="#3dff9a"
+                            ></canvas>
+                            <p class="chart-now" data-now="locomotion"></p>
+                        </figure>
+                        <figure>
+                            <figcaption>
+                                <h3>기어오르기</h3>
+                                <p>
+                                    같은 걸음 명령으로 비탈을 오르는 속도입니다.
+                                    건강한 파리와 같으면 위쪽 100%입니다.
+                                </p>
+                            </figcaption>
+                            <canvas
+                                data-key="climbing"
+                                data-color="#8ec8ff"
+                            ></canvas>
+                            <p class="chart-now" data-now="climbing"></p>
+                        </figure>
+                    </div>
+                </section>
+
+                <details class="panel notes">
+                    <summary>이 뇌가 FlyWire인 부분, 모형인 부분</summary>
+                    <ul id="notes"></ul>
+                </details>
+            </div>
+        </div>
+
+        <footer>
+            <p id="cite"></p>
+        </footer>
+        <script type="module" src="/app.js"></script>
+    </body>
+</html>
